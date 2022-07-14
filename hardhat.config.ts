@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-etherscan";
 
 module.exports = {
-  defaultNetwork: "mumbai",
+  defaultNetwork: "hardhat",
   networks: {
     hardhat: {
     },
