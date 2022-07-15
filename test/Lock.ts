@@ -2,10 +2,6 @@ import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { ethers } from "hardhat";
 import { expect } from "chai";
-// const { solidity } = require('ethereum-waffle')
-// const chai = require('chai');
-// chai.use(solidity);
-// const { expect } = chai
 
 describe("Lock", function () {
     // We define a fixture to reuse the same setup in every test.
