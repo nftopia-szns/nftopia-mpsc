@@ -1,17 +1,28 @@
-import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
-import { expect } from "chai";
-import { ERC721NFTMarket__factory, ERC721NFTSingleBundle__factory, TestErc20__factory, TestErc721__factory, TestWETH, TestWETH__factory } from "../typechain-types"
-// import { HardhatEthersHelpers } from "@nomiclabs/hardhat-ethers/types";
+import { assert, expect } from "chai";
+import {
+    ERC721NFTMarket,
+    ERC721NFTMarket__factory,
+    ERC721NFTSingleBundle,
+    ERC721NFTSingleBundle__factory,
+    TestErc20,
+    TestErc20__factory,
+    TestErc721,
+    TestErc721__factory,
+    TestWETH,
+    TestWETH__factory
+} from "../typechain-types"
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { BigNumber } from "ethers";
 
 describe("ERC721NFTMarket", function () {
-    async function testFixture() {
+    async function deployContracts() {
         // assign all necessary accounts
         const signers = await ethers.getSigners();
-        const owner = signers[0].address
-        const buyer = signers[1].address
-        const feeRecipient = signers[2].address
+        const owner = signers[0]
+        const buyer = signers[1]
+        const feeRecipient = signers[2]
 
         // contract factories
         const ERC721 = await ethers.getContractFactory("TestErc721") as TestErc721__factory
@@ -27,20 +38,65 @@ describe("ERC721NFTMarket", function () {
         const weth = await WETH.deploy()
         const nftMarket = await ERC721NFTMarket.deploy(
             weth.address,
-            feeRecipient,
+            feeRecipient.address,
             100, // 1%
         )
-        const bundle = await NFTBundle.deploy(nft.address, "1", "!");
+        const bundle = await NFTBundle.deploy(
+            nft.address,
+            "1",
+            "!");
 
+        // wait for deployment txs are mined
+        await nft.deployed()
+        await erc20.deployed()
+        await erc202.deployed()
+        await weth.deployed()
+        await nftMarket.deployed()
+        await bundle.deployed()
+
+        await bundle.setApprovalForAll(nftMarket.address, true);
+
+        return {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        }
+    }
+
+    async function prepareForTest({
+        owner,
+        buyer,
+        feeRecipient,
+        nft,
+        erc20,
+        erc202,
+        weth,
+        nftMarket,
+        bundle,
+    }: {
+        owner: SignerWithAddress,
+        buyer: SignerWithAddress,
+        feeRecipient: SignerWithAddress,
+        nft: TestErc721,
+        erc20: TestErc20,
+        erc202: TestErc20,
+        weth: TestWETH,
+        nftMarket: ERC721NFTMarket,
+        bundle: ERC721NFTSingleBundle,
+    }) {
         // mint tokens
         await nft.mint(1000)
         // reconnect for buyer making txs
-        erc20.connect(buyer)
-        await erc20.mint(2000)
-        await erc20.approve(nftMarket.address, 2000);
-        erc202.connect(buyer)
-        await erc202.mint(2000)
-        await erc202.approve(nftMarket.address, 2000);
+        await erc20.connect(buyer).mint(2000)
+        await erc20.connect(buyer).approve(nftMarket.address, 2000);
+        await erc202.connect(buyer).mint(2000)
+        await erc202.connect(buyer).approve(nftMarket.address, 2000);
 
         await nft.setApprovalForAll(nftMarket.address, true)
 
@@ -51,25 +107,414 @@ describe("ERC721NFTMarket", function () {
             bundle.address,
             bundle.address
         );
+    }
 
-        await bundle.setApprovalForAll(nftMarket.address, true);
-
-        return {
+    it("create ask", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
             nft,
             erc20,
             erc202,
             weth,
             nftMarket,
             bundle,
-        }
-    }
+        } = await loadFixture(deployContracts)
 
-    describe("Create ask", function () {
-        it("Should fail when price = 0", async () => {
-            const { nft, erc20, nftMarket } = await testFixture()
-            await expect(nftMarket.createAsk(nft.address, 1000, erc20.address, 0)).to.be.revertedWith(
-                "Ask: Price must be greater than zero"
-            )
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
         })
+
+        await expect(
+            nftMarket.createAsk(
+                nft.address,
+                1000,
+                erc20.address,
+                0
+            )
+        ).to.be.revertedWith(
+            "Ask: Price must be greater than zero"
+        )
+
+        await expect(
+            nftMarket.connect(buyer).createAsk(
+                nft.address,
+                1000,
+                erc20.address,
+                10
+            )
+        ).to.be.revertedWith(
+            "ERC721: transfer from incorrect owner"
+        );
+
+        await nftMarket.createAsk(
+            nft.address,
+            1000,
+            erc20.address,
+            1000
+        );
+
+        await expect(
+            nftMarket.connect(buyer).cancelAsk(
+                nft.address,
+                1000
+            )
+        ).to.be.revertedWith(
+            "Ask: only seller"
+        );
+
+        await nftMarket.cancelAsk(
+            nft.address,
+            1000
+        );
+
+        assert.equal(await nft.ownerOf(1000), owner.address);
     })
+
+    it("buy", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await expect(
+            nftMarket.connect(buyer).buy(
+                nft.address,
+                1000,
+                erc202.address,
+                1000,
+                paddedZeros)
+        ).to.be.revertedWith(
+            "token is not sell"
+        );
+
+        await nftMarket.createAsk(
+            nft.address,
+            1000,
+            erc20.address,
+            1000
+        );
+
+        await expect(
+            nftMarket.connect(buyer).buy(
+                nft.address,
+                1000,
+                erc202.address,
+                1000,
+                paddedZeros)
+        ).to.be.revertedWith(
+            "Buy: Incorrect quote token"
+        );
+
+        await expect(
+            nftMarket.connect(buyer).buy(
+                nft.address,
+                1000,
+                erc20.address,
+                500,
+                paddedZeros)
+        ).to.be.revertedWith(
+            "Buy: Incorrect price"
+        );
+
+        await expect(
+            nftMarket.connect(buyer).buy(
+                nft.address,
+                1000,
+                erc20.address,
+                1001,
+                paddedZeros)
+        ).to.be.revertedWith(
+            "Buy: Incorrect price"
+        );
+
+        await nftMarket.connect(buyer).buy(
+            nft.address,
+            1000,
+            erc20.address,
+            1000,
+            paddedZeros);
+
+        assert.equal(await nft.ownerOf(1000), buyer.address);
+        assert.equal((await erc20.balanceOf(owner.address)).toNumber(), 990);
+    });
+
+
+    it("buy using eth", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await expect(
+            nftMarket.buyUsingEth(
+                nft.address,
+                1000,
+                paddedZeros)
+        ).to.be.revertedWith(
+            "token is not sell"
+        );
+
+        await nftMarket.createAsk(
+            nft.address,
+            1000,
+            weth.address,
+            1
+        );
+
+        await nftMarket.connect(buyer).buyUsingEth(
+            nft.address,
+            1000,
+            paddedZeros,
+            { value: 1 }
+        );
+
+        assert.equal(await nft.ownerOf(1000), buyer.address);
+        assert.equal(await (await weth.balanceOf(owner.address)).toNumber(), 1);
+    });
+
+
+    it("bid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await nftMarket.connect(buyer).createBid(
+            nft.address,
+            1000,
+            erc20.address,
+            1000,
+            paddedZeros,
+        );
+
+        await expect(
+            nftMarket.connect(buyer).createBid(
+                nft.address,
+                1000,
+                erc20.address,
+                0,
+                paddedZeros,
+            ),
+        ).to.be.revertedWith(
+            "Bid: Price must be granter than zero"
+        );
+
+        await expect(
+            nftMarket.acceptBid(
+                nft.address,
+                1000,
+                buyer.address,
+                erc20.address,
+                2
+            ),
+        ).to.be.revertedWith(
+            "AcceptBid: invalid price"
+        );
+
+        await expect(
+            nftMarket.connect(buyer).acceptBid(
+                nft.address,
+                1000,
+                buyer.address,
+                erc20.address,
+                1000,
+            ),
+        ).to.be.revertedWith(
+            "ERC721: transfer from incorrect owner"
+        );
+
+        await expect(
+            nftMarket.acceptBid(
+                nft.address,
+                1000,
+                buyer.address,
+                erc202.address,
+                1000
+            ),
+        ).to.be.revertedWith(
+            "AcceptBid: invalid quoteToken"
+        );
+
+        await nftMarket.acceptBid(
+            nft.address,
+            1000,
+            buyer.address,
+            erc20.address,
+            1000
+        );
+        assert.equal(await nft.ownerOf(1000), buyer.address);
+        assert.equal(await (await erc20.balanceOf(owner.address)).toNumber(), 990);
+    });
+
+    it("bid using eth", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await nftMarket.connect(buyer).createBidUsingEth(
+            nft.address,
+            1000,
+            paddedZeros,
+            {
+                value: 1,
+            }
+        );
+
+        await nftMarket.acceptBid(
+            nft.address,
+            1000,
+            buyer.address,
+            weth.address,
+            1
+        );
+        assert.equal(await nft.ownerOf(1000), buyer.address);
+        assert.equal(await (await weth.balanceOf(owner.address)).toNumber(), 1);
+    });
+
+
+    it("cancel bid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await nftMarket.connect(buyer).createBid(
+            nft.address,
+            1000,
+            erc20.address,
+            1000,
+            paddedZeros,
+        );
+
+        await nftMarket.connect(buyer).cancelBid(
+            nft.address,
+            1000
+        );
+
+        await expect(
+            nftMarket.connect(buyer).cancelBid(
+                nft.address,
+                1000),
+        ).to.be.revertedWith(
+            "Bid: bid not found"
+        );
+
+        assert.equal(await (await erc20.balanceOf(buyer.address)).toNumber(), 2000);
+    });
 })

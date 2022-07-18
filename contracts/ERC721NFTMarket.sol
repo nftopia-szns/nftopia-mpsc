@@ -176,7 +176,7 @@ contract ERC721NFTMarket is
     ) private {
         Ask memory ask = asks[_nft][_tokenId];
 
-        require(ask.quoteToken == _quoteToken, "Buy: Incorrect qoute token");
+        require(ask.quoteToken == _quoteToken, "Buy: Incorrect quote token");
         require(ask.price == _price, "Buy: Incorrect price");
         _validateFingerprint(_nft, _tokenId, _fingeprint);
         uint256 fees = _distributeFees(_nft, _quoteToken, _price);
