@@ -14,7 +14,6 @@ import {
     TestWETH__factory
 } from "../typechain-types"
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber } from "ethers";
 
 describe("ERC721NFTMarket", function () {
     async function deployContracts() {
@@ -516,5 +515,300 @@ describe("ERC721NFTMarket", function () {
         );
 
         assert.equal(await (await erc20.balanceOf(buyer.address)).toNumber(), 2000);
+    });
+
+    it("update bid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await nftMarket.connect(buyer).createBid(
+            nft.address,
+            1000,
+            erc20.address,
+            500,
+            paddedZeros,
+        );
+
+        await nftMarket.connect(buyer).createBid(
+            nft.address,
+            1000,
+            erc20.address,
+            600,
+            paddedZeros,
+        );
+
+        assert.equal(await (await erc20.balanceOf(buyer.address)).toNumber(), 1400);
+    });
+
+    it("setProtocolFeePercent", async () => {
+        const { nftMarket } = await loadFixture(deployContracts)
+
+        await expect(
+            nftMarket.setProtocolFeePercent(501), "max_fee");
+    });
+
+
+    it("accept bid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await nftMarket.createAsk(
+            nft.address,
+            1000,
+            erc20.address,
+            100
+        );
+
+        await nftMarket.connect(buyer).createBid(
+            nft.address,
+            1000,
+            erc20.address,
+            100,
+            paddedZeros);
+
+        await expect(
+            nftMarket.connect(buyer).acceptBid(
+                nft.address,
+                1000,
+                buyer.address,
+                erc20.address,
+                100),
+        ).to.be.revertedWith(
+            "ERC721: transfer from incorrect owner"
+        );
+
+        await nftMarket.acceptBid(
+            nft.address,
+            1000,
+            buyer.address,
+            erc20.address,
+            100
+        );
+        assert.equal(await (await erc20.balanceOf(owner.address)).toNumber(), 99);
+        assert.equal(await (await erc20.balanceOf(feeRecipient.address)).toNumber(), 1);
+        assert.equal(await (await erc20.balanceOf(buyer.address)).toNumber(), 1900);
+        assert.equal(await nft.ownerOf(1000), buyer.address);
+    });
+
+    it("Bid: verify fingerPrint  valid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        await nftMarket.connect(buyer).createBid(
+            bundle.address,
+            1,
+            erc20.address,
+            500,
+            await bundle.getFingerprint(1),
+        );
+
+        await await nftMarket.connect(owner).acceptBid(
+            bundle.address,
+            1,
+            buyer.address,
+            erc20.address,
+            500
+        );
+    });
+
+    it("Bid: verify fingerPrint invalid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await nftMarket.connect(buyer).createBid(
+            bundle.address,
+            1,
+            erc20.address,
+            500,
+            paddedZeros,
+        );
+
+        await expect(
+            nftMarket.acceptBid(
+                bundle.address,
+                1,
+                buyer.address,
+                erc20.address,
+                500),
+        ).to.be.revertedWith(
+            "Erc721Fingerprint: invalid fingerprint"
+        );
+    });
+
+    it("Buy: verify fingerPrint  valid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        await nftMarket.createAsk(
+            bundle.address,
+            1,
+            erc20.address,
+            1
+        );
+
+        await nftMarket.connect(buyer).buy(
+            bundle.address,
+            1,
+            erc20.address,
+            1,
+            await bundle.getFingerprint(1),
+        );
+    });
+
+    it("Buy: verify fingerPrint invalid", async () => {
+        const {
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        } = await loadFixture(deployContracts)
+
+        await prepareForTest({
+            owner,
+            buyer,
+            feeRecipient,
+            nft,
+            erc20,
+            erc202,
+            weth,
+            nftMarket,
+            bundle,
+        })
+
+        const paddedZeros = ethers.utils.hexZeroPad("0x", 32)
+
+        await nftMarket.createAsk(
+            bundle.address,
+            1,
+            erc20.address,
+            1
+        );
+
+        await expect(
+            nftMarket.connect(buyer).buy(
+                bundle.address,
+                1,
+                erc20.address,
+                1,
+                paddedZeros),
+        ).to.be.revertedWith(
+            "Erc721Fingerprint: invalid fingerprint"
+        );
     });
 })
