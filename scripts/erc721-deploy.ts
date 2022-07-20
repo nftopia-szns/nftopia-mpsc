@@ -5,7 +5,6 @@ async function main() {
 
   // Start deployment, returning a promise that resolves to a contract object
   const testNFT = await TestErc721.deploy()
-  await testNFT.deployed()
   console.log("Contract deployed to address:", testNFT.address)
 }
 
