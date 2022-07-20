@@ -36,3 +36,9 @@ npx hardhat verify --network mumbai DEPLOYED_CONTRACT_ADDRESS OPTIONAL_CONTRUCTO
 Constants:
 - 10^18 = 1000000000000000000
 - padded zeros fingerprint = 0x0000000000000000000000000000000000000000000000000000000000000000
+
+Addresses and test transactions:
+- transaction list item: https://mumbai.polygonscan.com/tx/0x2d3c69776eb4a4c876821f2c27bd4cd2d3d6b8f21bb951e1db4922cea1ee6eff
+- transaction buy item: https://mumbai.polygonscan.com/tx/0xe77e6982b452dcf0d4f6091546e29b5d199bcfbfa97294f50f472f56613d5d57
+- transaction create bid: https://mumbai.polygonscan.com/tx/0xb45cb3d1ead549d8608a1c1b637942791f4fc3ae47dd30bf53183836abf52f22
+- transaction accept bid: https://mumbai.polygonscan.com/tx/0xccbb747633e5b8b4b3606c5f0072ae00c7cf1207551f34140cb05fe1550f9f35
