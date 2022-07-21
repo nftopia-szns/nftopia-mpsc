@@ -46,8 +46,6 @@ export type { ERC721NFTMarket } from "./contracts/ERC721NFTMarket";
 export { ERC721NFTMarket__factory } from "./factories/contracts/ERC721NFTMarket__factory";
 export type { ERC721NFTSingleBundle } from "./contracts/ERC721NFTSingleBundle";
 export { ERC721NFTSingleBundle__factory } from "./factories/contracts/ERC721NFTSingleBundle__factory";
-export type { IArtworkNFT } from "./contracts/interfaces/IArtWorkNFT.sol/IArtworkNFT";
-export { IArtworkNFT__factory } from "./factories/contracts/interfaces/IArtWorkNFT.sol/IArtworkNFT__factory";
 export type { IERC721Fingerprint } from "./contracts/interfaces/IERC721Fingerprint";
 export { IERC721Fingerprint__factory } from "./factories/contracts/interfaces/IERC721Fingerprint__factory";
 export type { IWETH } from "./contracts/interfaces/IWETH";

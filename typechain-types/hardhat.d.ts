@@ -93,10 +93,6 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.ERC721NFTSingleBundle__factory>;
     getContractFactory(
-      name: "IArtworkNFT",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.IArtworkNFT__factory>;
-    getContractFactory(
       name: "IERC721Fingerprint",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IERC721Fingerprint__factory>;
@@ -221,11 +217,6 @@ declare module "hardhat/types/runtime" {
       address: string,
       signer?: ethers.Signer
     ): Promise<Contracts.ERC721NFTSingleBundle>;
-    getContractAt(
-      name: "IArtworkNFT",
-      address: string,
-      signer?: ethers.Signer
-    ): Promise<Contracts.IArtworkNFT>;
     getContractAt(
       name: "IERC721Fingerprint",
       address: string,
